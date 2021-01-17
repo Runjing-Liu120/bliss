@@ -41,7 +41,7 @@ def get_full_params(slen: int, tile_params: dict):
     # NOTE: off sources should have tile_locs == 0.
     # NOTE: assume that each param in each tile is already pushed to the front.
     required = {"n_sources", "locs"}
-    optional = {"galaxy_bool", "galaxy_params", "fluxes", "log_fluxes"}
+    optional = {"galaxy_bool", "galaxy_params", "fluxes"}
     assert isinstance(slen, int) and isinstance(tile_params, dict)
     assert required.issubset(tile_params.keys())
     # tile_params does not contain extraneous keys
@@ -136,6 +136,8 @@ def _get_tile_coords(slen, tile_slen):
 def _loc_mean_func(x):
     return torch.sigmoid(x) * (x != 0).float()
 
+def _flux_mean_func(x):
+    return torch.exp(x) * (x != 0).float()
 
 def _prob_galaxy_func(x):
     return torch.sigmoid(x).clamp(1e-4, 1 - 1e-4)
@@ -438,19 +440,17 @@ class ImageEncoder(nn.Module):
         tile_galaxy_bool *= tile_is_on_array
         tile_star_bool = get_star_bool(tile_n_sources, tile_galaxy_bool)
         pred["loc_sd"] = torch.exp(0.5 * pred["loc_logvar"])
-        pred["log_flux_sd"] = torch.exp(0.5 * pred["log_flux_logvar"])
+        pred["flux_sd"] = torch.exp(0.5 * pred["flux_logvar"])
         tile_locs = self._get_normal_samples(
             pred["loc_mean"], pred["loc_sd"], tile_is_on_array
         )
-        tile_log_fluxes = self._get_normal_samples(
-            pred["log_flux_mean"], pred["log_flux_sd"], tile_star_bool
+        tile_fluxes = self._get_normal_samples(
+            pred["flux_mean"], pred["flux_sd"], tile_star_bool
         )
-        tile_fluxes = tile_log_fluxes.exp() * tile_star_bool
         return {
             "n_sources": tile_n_sources,
             "locs": tile_locs,
             "galaxy_bool": tile_galaxy_bool,
-            "log_fluxes": tile_log_fluxes,
             "fluxes": tile_fluxes,
         }
 
@@ -488,19 +488,16 @@ class ImageEncoder(nn.Module):
         )
         tile_locs = tile_locs.clamp(0, 1)
 
-        # then log_fluxes
+        # then fluxes
         tile_star_bool = get_star_bool(tile_n_sources, tile_galaxy_bool)
-        log_flux_sd = torch.zeros_like(pred["log_flux_logvar"])
-        tile_log_fluxes = self._get_normal_samples(
-            pred["log_flux_mean"], log_flux_sd, tile_is_on_array
+        flux_sd = torch.zeros_like(pred["flux_logvar"])
+        tile_fluxes = self._get_normal_samples(
+            pred["flux_mean"], flux_sd, tile_star_bool
         )
-        tile_log_fluxes *= tile_star_bool
-        tile_fluxes = tile_log_fluxes.exp() * tile_star_bool
-
+        
         tile_estimate = {
             "locs": tile_locs,
             "galaxy_bool": tile_galaxy_bool,
-            "log_fluxes": tile_log_fluxes,
             "fluxes": tile_fluxes,
         }
 
@@ -526,8 +523,8 @@ class ImageEncoder(nn.Module):
         return {
             "loc_mean": {"dim": 2, "transform": _loc_mean_func},
             "loc_logvar": {"dim": 2, "transform": _identity_func},
-            "log_flux_mean": {"dim": self.n_bands, "transform": _identity_func},
-            "log_flux_logvar": {"dim": self.n_bands, "transform": _identity_func},
+            "flux_mean": {"dim": self.n_bands, "transform": _flux_mean_func},
+            "flux_logvar": {"dim": self.n_bands, "transform": _identity_func},
             "prob_galaxy": {
                 "dim": 1,
                 "transform": _prob_galaxy_func,

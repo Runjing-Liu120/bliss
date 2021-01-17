@@ -334,7 +334,6 @@ class ImageDecoder(nn.Module):
         )
         galaxy_params = self._sample_galaxy_params(n_galaxies, galaxy_bool)
         fluxes = self._sample_fluxes(n_sources, star_bool, batch_size)
-        log_fluxes = self._get_log_fluxes(fluxes)
 
         # per tile quantities.
         return {
@@ -343,17 +342,7 @@ class ImageDecoder(nn.Module):
             "galaxy_bool": galaxy_bool,
             "galaxy_params": galaxy_params,
             "fluxes": fluxes,
-            "log_fluxes": log_fluxes,
         }
-
-    @staticmethod
-    def _get_log_fluxes(fluxes):
-        log_fluxes = torch.where(
-            fluxes > 0, fluxes, torch.ones(*fluxes.shape).to(device)
-        )  # prevent log(0) errors.
-        log_fluxes = torch.log(log_fluxes)
-
-        return log_fluxes
 
     @staticmethod
     def _apply_noise(images_mean):

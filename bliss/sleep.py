@@ -235,7 +235,7 @@ class SleepPhase(pl.LightningModule):
         """
 
         loc_mean shape = (n_ptiles x max_detections x 2)
-        log_flux_mean shape = (n_ptiles x max_detections x n_bands)
+        flux_mean shape = (n_ptiles x max_detections x n_bands)
 
         the *_logvar inputs should the same shape as their respective means
         the true_tile_* inputs, except for true_tile_is_on_array,
@@ -260,13 +260,13 @@ class SleepPhase(pl.LightningModule):
         (
             images,
             true_tile_locs,
-            true_tile_log_fluxes,
+            true_tile_fluxes,
             true_tile_galaxy_bool,
             true_tile_n_sources,
         ) = (
             batch["images"],
             batch["locs"],
-            batch["log_fluxes"],
+            batch["fluxes"],
             batch["galaxy_bool"],
             batch["n_sources"],
         )
@@ -280,13 +280,13 @@ class SleepPhase(pl.LightningModule):
 
         # clip decoder output since constraint is: max_detections <= max_sources (per tile)
         true_tile_locs = true_tile_locs[:, :, 0:max_sources]
-        true_tile_log_fluxes = true_tile_log_fluxes[:, :, 0:max_sources]
+        true_tile_fluxes = true_tile_fluxes[:, :, 0:max_sources]
         true_tile_galaxy_bool = true_tile_galaxy_bool[:, :, 0:max_sources]
         true_tile_n_sources = true_tile_n_sources.clamp(max=max_sources)
 
         # flatten so first dimension is ptile
         true_tile_locs = true_tile_locs.view(n_ptiles, max_sources, 2)
-        true_tile_log_fluxes = true_tile_log_fluxes.view(n_ptiles, max_sources, n_bands)
+        true_tile_fluxes = true_tile_fluxes.view(n_ptiles, max_sources, n_bands)
         true_tile_galaxy_bool = true_tile_galaxy_bool.view(n_ptiles, max_sources)
         true_tile_n_sources = true_tile_n_sources.view(n_ptiles)
         true_tile_is_on_array = encoder.get_is_on_from_n_sources(
@@ -314,7 +314,7 @@ class SleepPhase(pl.LightningModule):
             true_tile_locs, loc_mean, loc_logvar
         )
         star_params_log_probs_all = _get_params_logprob_all_combs(
-            true_tile_log_fluxes, pred["log_flux_mean"], pred["log_flux_logvar"]
+            true_tile_fluxes, pred["flux_mean"], pred["flux_logvar"]
         )
         prob_galaxy = pred["prob_galaxy"].view(n_ptiles, max_sources)
 
