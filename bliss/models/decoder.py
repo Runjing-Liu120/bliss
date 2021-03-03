@@ -128,6 +128,25 @@ class ImageDecoder(pl.LightningModule):
     def forward(self):
         return self.star_tile_decoder.psf_forward()
 
+    def sample_prior(self, batch_size=1):
+        n_sources = self._sample_n_sources(batch_size)
+        is_on_array = get_is_on_from_n_sources(n_sources, self.max_sources)
+        locs = self._sample_locs(is_on_array, batch_size)
+
+        n_galaxies, _, galaxy_bool, star_bool = self._sample_n_galaxies_and_stars(
+            n_sources, is_on_array
+        )
+        galaxy_params = self._sample_galaxy_params(n_galaxies, galaxy_bool)
+        fluxes = self._sample_fluxes(n_sources, star_bool, batch_size)
+
+        # per tile quantities.
+        return {
+            "n_sources": n_sources,
+            "locs": locs,
+            "galaxy_bool": galaxy_bool,
+            "galaxy_params": galaxy_params,
+            "fluxes": fluxes,
+        }
 
     def render_images(self, n_sources, locs, galaxy_bool, galaxy_params, fluxes, add_noise=True):
         # returns the **full** image in shape (batch_size x n_bands x slen x slen)
@@ -290,26 +309,6 @@ class ImageDecoder(pl.LightningModule):
         galaxy_params = galaxy_params * galaxy_bool
         return galaxy_params
 
-
-    def sample_prior(self, batch_size=1):
-        n_sources = self._sample_n_sources(batch_size)
-        is_on_array = get_is_on_from_n_sources(n_sources, self.max_sources)
-        locs = self._sample_locs(is_on_array, batch_size)
-
-        n_galaxies, _, galaxy_bool, star_bool = self._sample_n_galaxies_and_stars(
-            n_sources, is_on_array
-        )
-        galaxy_params = self._sample_galaxy_params(n_galaxies, galaxy_bool)
-        fluxes = self._sample_fluxes(n_sources, star_bool, batch_size)
-
-        # per tile quantities.
-        return {
-            "n_sources": n_sources,
-            "locs": locs,
-            "galaxy_bool": galaxy_bool,
-            "galaxy_params": galaxy_params,
-            "fluxes": fluxes,
-        }
 
     @staticmethod
     def _apply_noise(images_mean):
