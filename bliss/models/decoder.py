@@ -311,7 +311,7 @@ class ImageDecoder(pl.LightningModule):
         galaxy_params = galaxy_params * galaxy_bool
         return galaxy_params
 
-<<<<<<< HEAD
+
     def sample_prior(self, batch_size=1):
         n_sources = self._sample_n_sources(batch_size)
         is_on_array = get_is_on_from_n_sources(n_sources, self.max_sources)
