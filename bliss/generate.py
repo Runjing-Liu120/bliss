@@ -1,17 +1,16 @@
-#!/usr/bin/env python3
 import os
 import math
+from pathlib import Path
+
 import torch
 import matplotlib.pyplot as plt
 from omegaconf import DictConfig, OmegaConf
-from pathlib import Path
 
-from bliss.datasets import simulated, catsim
+from bliss.datasets import simulated
 from bliss import plotting
 
 datasets = {
     "SimulatedDataset": simulated.SimulatedDataset,
-    "CatsimGalaxies": catsim.CatsimGalaxies,
 }
 
 
@@ -34,7 +33,7 @@ def visualize(batch, path, n_samples, figsize=(12, 12)):
     fig.savefig(path, bbox_inches="tight")
 
 
-def main(cfg: DictConfig):
+def generate(cfg: DictConfig):
     # setup
     paths = OmegaConf.to_container(cfg.paths, resolve=True)
     output = Path(paths["root"]).joinpath(paths["output"])
@@ -68,7 +67,3 @@ def main(cfg: DictConfig):
     # save batch and images as pdf for visualization purposes.
     torch.save(fbatch, filepath)
     visualize(fbatch, imagepath, cfg.generate.n_plots)
-
-
-if __name__ == "__main__":
-    main()

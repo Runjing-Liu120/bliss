@@ -18,7 +18,7 @@ class WakeNet(pl.LightningModule):
         observed_img,
         hparams,
     ):
-        super(WakeNet, self).__init__()
+        super().__init__()
 
         self.star_encoder = star_encoder
         self.image_decoder = image_decoder
@@ -91,19 +91,17 @@ class WakeNet(pl.LightningModule):
         image_indx_start = self.border_padding
         image_indx_end = self.border_padding + self.slen
         loss = (
-            error[
-                :, :, image_indx_start:image_indx_end, image_indx_start:image_indx_end
-            ]
+            error[:, :, image_indx_start:image_indx_end, image_indx_start:image_indx_end]
             .sum((1, 2, 3))
             .mean()
         )
         return loss
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch, batch_idx):  # pylint: disable=unused-argument
         loss = self.get_loss(batch)
         self.log("train_loss", loss)
         return loss
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx):  # pylint: disable=unused-argument
         loss = self.get_loss(batch)
         self.log("validation_loss", loss)

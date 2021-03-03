@@ -1,17 +1,16 @@
 import pytest
-import pathlib
 import torch
 import pytorch_lightning as pl
 from hydra.experimental import initialize, compose
 
 from bliss import sleep
-from bliss.datasets import simulated, catsim
+from bliss.datasets import simulated, galsim_galaxies
 from bliss.models import galaxy_net
 
 
 # command line arguments for tests
 def pytest_addoption(parser):
-    parser.addoption("--gpus", default="0", type=str, help="--gpus option for trainer.")
+    parser.addoption("--gpus", default="cpu", type=str, help="--gpus option for trainer.")
 
 
 def get_cfg(overrides, devices):
@@ -25,7 +24,7 @@ def get_cfg(overrides, devices):
 
 class DeviceSetup:
     def __init__(self, gpus):
-        self.use_cuda = torch.cuda.is_available() if gpus != "" else False
+        self.use_cuda = torch.cuda.is_available() if gpus != "cpu" else False
         self.gpus = gpus if self.use_cuda else None
 
         # setup device
@@ -79,20 +78,24 @@ class GalaxyVAESetup:
 
     def get_trained_vae(self, overrides):
         cfg = self.get_cfg(overrides)
-        dataset = catsim.SavedCatsim(cfg)
+        dataset = galsim_galaxies.GalsimGalaxies(cfg)
         galaxy_vae = galaxy_net.OneCenteredGalaxy(cfg)
         trainer = pl.Trainer(**cfg.training.trainer)
         trainer.fit(galaxy_vae, datamodule=dataset)
         return galaxy_vae.to(self.devices.device)
 
+    def test_vae(self, overrides, galaxy_net):
+        cfg = self.get_cfg(overrides)
+        test_module = galsim_galaxies.GalsimGalaxies(cfg)
+        trainer = pl.Trainer(**cfg.training.trainer)
+        return trainer.test(galaxy_net, datamodule=test_module)[0]
+
 
 @pytest.fixture(scope="session")
 def paths():
-    root_path = pathlib.Path(__file__).parent.parent.absolute()
-    return {
-        "data": root_path.joinpath("data"),
-        "model_dir": root_path.joinpath("trials_result"),
-    }
+    with initialize(config_path="../config"):
+        cfg = compose("config")
+    return cfg.paths
 
 
 @pytest.fixture(scope="session")

@@ -1,5 +1,5 @@
-from bliss import generate
 from hydra.experimental import initialize, compose
+from bliss import generate
 
 
 def test_generate_run(devices):
@@ -10,4 +10,4 @@ def test_generate_run(devices):
     with initialize(config_path="../config"):
 
         cfg = compose("config", overrides=overrides)
-        generate.main(cfg)
+        generate.generate(cfg)

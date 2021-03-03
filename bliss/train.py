@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from pathlib import Path
 import shutil
 
@@ -9,14 +8,13 @@ import pytorch_lightning as pl
 from pytorch_lightning.profiler import AdvancedProfiler
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
-import torch
 
 from bliss import sleep
-from bliss.datasets import simulated, catsim
+from bliss.datasets import simulated, galsim_galaxies
 from bliss.models import galaxy_net
 
 # compatible datasets and models.
-_datasets = [simulated.SimulatedDataset, catsim.SavedCatsim, catsim.CatsimGalaxies]
+_datasets = [simulated.SimulatedDataset, galsim_galaxies.GalsimGalaxies]
 datasets = {cls.__name__: cls for cls in _datasets}
 
 _models = [sleep.SleepPhase, galaxy_net.OneCenteredGalaxy]
@@ -38,7 +36,7 @@ def setup_paths(cfg: DictConfig, enforce_overwrite=True):
     output.mkdir(parents=False, exist_ok=not enforce_overwrite)
 
     for p in paths.values():
-        assert Path(p).exists(), f"path {p.as_posix()} does not exist"
+        assert Path(p).exists(), f"path {Path(p).as_posix()} does not exist"
 
     return paths
 
@@ -75,7 +73,7 @@ def setup_checkpoint_callback(cfg, paths, logger):
             filepath=checkpoint_dir,
             save_top_k=True,
             verbose=True,
-            monitor="val_detection_loss",
+            monitor="val_loss",
             mode="min",
             prefix="",
         )
@@ -83,7 +81,7 @@ def setup_checkpoint_callback(cfg, paths, logger):
     return checkpoint_callback
 
 
-def main(cfg: DictConfig):
+def train(cfg: DictConfig):
 
     # setup paths and seed
     paths = setup_paths(cfg, enforce_overwrite=False)
@@ -111,7 +109,3 @@ def main(cfg: DictConfig):
     # test!
     if cfg.testing.file is not None:
         _ = trainer.test(model, datamodule=dataset)
-
-
-if __name__ == "__main__":
-    main()

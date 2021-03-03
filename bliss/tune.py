@@ -1,15 +1,13 @@
 import os
-import numpy as np
 import logging
 
+import numpy as np
 import hydra
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
-
 import pytorch_lightning as pl
 
 import ray
-from ray import tune
 from ray.tune.suggest.hyperopt import HyperOptSearch
 from ray.tune.suggest import ConcurrencyLimiter
 from ray.tune import CLIReporter
@@ -46,7 +44,7 @@ def sleep_trainable(search_space, cfg: DictConfig):
         callbacks=[
             TuneReportCallback(
                 {
-                    "loss": "val_detection_loss",
+                    "loss": "val_loss",
                     "star_count_acc": "val_acc_counts",
                     "galaxy_counts_acc": "val_gal_counts",
                     "locs_mae": "val_locs_mae",
@@ -60,7 +58,7 @@ def sleep_trainable(search_space, cfg: DictConfig):
 
 
 # model=m2 dataset=m2 training=m2 optimizer=m2 in terminal
-def main(cfg: DictConfig, local_mode=False):
+def tune(cfg: DictConfig, local_mode=False):
     # sets seeds for numpy, torch, and python.random
     # TODO: Test reproducibility and decide wether to use `Trainer(deterministic=True)`, 10% slower
     pl.trainer.seed_everything(cfg.tuning.seed)
@@ -78,11 +76,11 @@ def main(cfg: DictConfig, local_mode=False):
         # Not as clean as tune.randint(*cfg.tuning...)
         # Work around solution so that these values are correctly displayed in tensorboard
         # This also creats primitive dtype supported by omegaconf
-        "enc_conv_c": tune.choice(discrete_search_space["enc_conv_c"]),
-        "enc_kern": tune.choice(discrete_search_space["enc_kern"]),
-        "enc_hidden": tune.choice(discrete_search_space["enc_hidden"]),
-        "lr": tune.loguniform(*cfg.tuning.search_space.lr),
-        "weight_decay": tune.loguniform(*cfg.tuning.search_space.weight_decay),
+        "enc_conv_c": ray.tune.choice(discrete_search_space["enc_conv_c"]),
+        "enc_kern": ray.tune.choice(discrete_search_space["enc_kern"]),
+        "enc_hidden": ray.tune.choice(discrete_search_space["enc_hidden"]),
+        "lr": ray.tune.loguniform(*cfg.tuning.search_space.lr),
+        "weight_decay": ray.tune.loguniform(*cfg.tuning.search_space.weight_decay),
     }
 
     # scheduler
@@ -113,9 +111,7 @@ def main(cfg: DictConfig, local_mode=False):
     else:
         search_alg = HyperOptSearch(random_state_seed=cfg.tuning.seed)
 
-    search_alg = ConcurrencyLimiter(
-        search_alg, max_concurrent=cfg.tuning.max_concurrent
-    )
+    search_alg = ConcurrencyLimiter(search_alg, max_concurrent=cfg.tuning.max_concurrent)
 
     # define how to report the results
     reporter = CLIReporter(
@@ -137,8 +133,8 @@ def main(cfg: DictConfig, local_mode=False):
 
     # run the trials
     # TODO add stop criterion for nan loss
-    analysis = tune.run(
-        tune.with_parameters(sleep_trainable, cfg=cfg),
+    analysis = ray.tune.run(
+        ray.tune.with_parameters(sleep_trainable, cfg=cfg),
         resources_per_trial={"gpu": cfg.tuning.gpus_per_trial},
         num_samples=cfg.tuning.n_samples,
         verbose=cfg.tuning.verbose,
@@ -155,10 +151,4 @@ def main(cfg: DictConfig, local_mode=False):
     if cfg.tuning.save:
         best_result = analysis.best_result
         conf = OmegaConf.create(best_result)
-        OmegaConf.save(
-            conf, hydra.utils.to_absolute_path(cfg.tuning.best_config_save_path)
-        )
-
-
-if __name__ == "__main__":
-    main()
+        OmegaConf.save(conf, hydra.utils.to_absolute_path(cfg.tuning.best_config_save_path))
