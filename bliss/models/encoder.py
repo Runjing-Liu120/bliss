@@ -143,8 +143,9 @@ def _sample_class_weights(class_weights, n_samples=1):
 def _loc_mean_func(x):
     return torch.sigmoid(x) * (x != 0).float()
 
-def _flux_mean_func(x):
-    return torch.exp(x) * (x != 0).float()
+# TODO how to set this constant?
+def _flux_mean_func(x, const = 1000.):
+    return torch.exp(x + np.log(const)) * (x != 0).float()
 
 def _prob_galaxy_func(x):
     return torch.sigmoid(x).clamp(1e-4, 1 - 1e-4)
@@ -422,7 +423,11 @@ class ImageEncoder(nn.Module):
             _param = self._indx_h_for_n_sources(h, n_sources, indx_mat, param_dim)
             param = transform(_param)
             est_params[k] = param
-
+        
+        est_params['flux_logvar'] = \
+            est_params['flux_logvar'] + \
+            torch.log(est_params['flux_mean'] + 1e-6)
+            
         return est_params
 
     @staticmethod
