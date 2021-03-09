@@ -426,8 +426,8 @@ class ImageEncoder(nn.Module):
         
         est_params['flux_logvar'] = \
             est_params['flux_logvar'] + \
-            torch.log(est_params['flux_mean'] + 1e-6)
-            
+            torch.log(est_params['flux_mean'] + 1e-6) * (est_params['flux_mean'] != 0).float()
+                
         return est_params
 
     @staticmethod
