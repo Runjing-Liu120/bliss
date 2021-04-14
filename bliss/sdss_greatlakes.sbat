@@ -4,7 +4,7 @@
 #SBATCH --partition=gpu
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=1
-#SBATCH --gpus-per-node=1
+#SBATCH --gpus-per-task=1
 #SBATCH --mem-per-gpu=2000m
 #SBATCH --time=01:00:00
 #SBATCH --account=stats_dept1
@@ -17,14 +17,37 @@ echo "Running on"
 scontrol show hostnames $SLURM_JOB_NODELIST
 fi
 
-# Install bliss
+# load environment
 module load python/3.8.7
 module load fftw/3.3.8
 cd bliss
-poetry install
-poetry shell
+
+# Getting the head node names
+nodes=$(scontrol show hostnames "$SLURM_JOB_NODELIST")
+nodes_array=($nodes)
+
+head_node=${nodes_array[0]}
+head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
+
+# start the head node
+port=6379
+ip_head=$head_node_ip:$port
+export ip_head
+echo "IP Head: $ip_head"
+
+echo "Starting HEAD at $head_node"
+srun --nodes=1 --ntasks=1 -w "$head_node" \
+    ray start --head --node-ip-address="$head_node_ip" --port=$port --num-gpus "${SLURM_GPUS_PER_TASK}" --block &
+
+# start the workers node
+worker_num=$((SLURM_JOB_NUM_NODES - 1))
+
+for ((i = 1; i <= worker_num; i++)); do
+    node_i=${nodes_array[$i]}
+    echo "Starting WORKER $i at $node_i"
+    srun --nodes=1 --ntasks=1 -w "$node_i" \
+        ray start --address "$ip_head" --num-gpus "${SLURM_GPUS_PER_TASK}" --block &
+    sleep 5
+done
 
 # run job
-srun --nodes=1 --relative=0 poetry run bliss mode='predict' 'predict.sdss.fields=[269]' &
-srun --nodes=1 --relative=1 poetry run bliss mode='predict' 'predict.sdss.fields=[270]' &
-wait
