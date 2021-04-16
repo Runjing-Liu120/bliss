@@ -248,8 +248,11 @@ class ToyGaussian(pl.LightningDataModule, Dataset):
         self.min_hlr = params.min_hlr
         self.max_hlr = params.max_hlr
         self.max_e = params.max_e
-
-    def __getitem__(self, idx):
+        
+        # set the images 
+        self._set_all_images()
+    
+    def _draw_one_image(self):
         flux_avg = np.random.uniform(self.min_flux, self.max_flux)
         hlr = np.random.uniform(self.min_hlr, self.max_hlr)  # arcseconds
         flux = (hlr / self.pixel_scale) ** 2 * np.pi * flux_avg  # approx
@@ -271,7 +274,24 @@ class ToyGaussian(pl.LightningDataModule, Dataset):
         noise = np.sqrt(image) * np.random.randn(*image.shape) * self.noise_factor
         image += noise
 
-        return {"images": image, "background": self.background}
+        return image
+    
+    def _set_all_images(self): 
+        print('constructing dataset ...')
+        
+        n_images = self.batch_size * self.n_batches
+        
+        self.images = np.ones((n_images, self.n_bands, self.slen, self.slen)).astype(np.float32)
+        self.backgrounds = np.array([self.background for i in range(n_images)])
+        
+        for i in range(n_images): 
+            self.images[i] = self._draw_one_image()
+        
+        print('done.')
+        
+    def __getitem__(self, indx): 
+        return {"images": self.images[indx], 
+                "background": self.backgrounds[indx]}
 
     def __len__(self):
         return self.batch_size * self.n_batches
