@@ -51,4 +51,4 @@ for ((i = 1; i <= worker_num; i++)); do
 done
 
 # run job with multi-run and ray launcher
-poetry run bliss -m mode='predict' predict.sdss.run=94 predict.sdss.camcol=1 predict.sdss.fields=[271] hydra/launcher=ray
+poetry run bliss -m mode='predict' predict.sdss.run=94 predict.sdss.camcol=1 predict.sdss.fields=[270],[271],[272] hydra/launcher=ray
